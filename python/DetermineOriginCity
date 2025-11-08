@@ -1,0 +1,19 @@
+import requests
+
+# Replace with your AeroAPI key
+API_KEY = "gROBeD6MpfawMAbCR2qgKf29wqDdqgcn"
+
+# Example endpoint — get flight information
+flight_id = "UAL100"  # United Airlines flight 100
+url = f"https://aeroapi.flightaware.com/aeroapi/flights/{flight_id}"
+
+# Make the request
+headers = {"x-apikey": API_KEY}
+response = requests.get(url, headers=headers)
+
+# Check and print results
+if response.status_code == 200:
+    data = response.json()
+    print(data)
+else:
+    print("Error:", response.status_code, response.text)
