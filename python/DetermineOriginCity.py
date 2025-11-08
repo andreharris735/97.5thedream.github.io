@@ -1,77 +1,63 @@
+from datetime import datetime
 import requests
-from datetime import datetime, timezone, timedelta
-
-API_KEY = "gROBeD6MpfawMAbCR2qgKf29wqDdqgcn"
+API_KEY = "NZwWg0a6maLfecEXeptumW9bopVjr9xp"
 
 # Time window in UTC
-start_time = "2025-10-30T22:00:00Z"  # after Oct 30, 5 PM local
-end_time = "2025-10-31T22:10:00Z"    # before Oct 31, 5:10 PM local
+START_TIME = "2025-10-30T22:00:00Z"  # after Oct 30, 5 PM local
+END_TIME = "2025-10-31T22:10:00Z"    # before Oct 31, 5:10 PM local
 
 # Endpoint for arrivals at Cedar Rapids (CID)
 url = "https://aeroapi.flightaware.com/aeroapi/airports/KCID/flights/arrivals"
 
 headers = {"x-apikey": API_KEY}
 params = {
-    "start": start_time,
-    "end": end_time,
+    "start": START_TIME,
+    "end": END_TIME,
 }
 
-# Function to convert UTC to Central Time (CST/CDT)
-def to_central_time(utc_str):
-    if not utc_str:
-        return "Unknown"
-    try:
-        utc_dt = datetime.fromisoformat(utc_str.replace("Z", "+00:00"))
-        central_offset = timedelta(hours=-6)  # adjust for CST (UTC-6); use -5 for CDT
-        central_dt = utc_dt + central_offset
-        return central_dt.strftime("%Y-%m-%d %I:%M %p CT")
-    except Exception:
-        return "Invalid time"
+data_payload = {"flights": []}
 
 response = requests.get(url, headers=headers, params=params)
 
-def get_KCID_flights():
-    num_flights = len(response.json()["arrivals"])
-    for i in range(num_flights):
-        actual_off = response.json()["arrivals"][i]["actual_off"]
-        if ((actual_off >= start_time) and (actual_off < end_time)):
-            #FIXME: Convert the Strings actual_off, start_time, actual_off, and end_time to datetime and compare
-            print("actual_off is " + actual_off)
-            print("start time is " + start_time)
-            print("end time is " + end_time)
-            print("success")
-        print(response.json()["arrivals"][i]["ident"])
-        print(response.json()["arrivals"][i]["flight_number"])
-        print(response.json()["arrivals"][i]["blocked"])
-        print(response.json()["arrivals"][i]["diverted"])
-        print(response.json()["arrivals"][i]["cancelled"])
-        print(response.json()["arrivals"][i]["origin"]["city"])
-        print(response.json()["arrivals"][i]["origin"]["name"])
-        print(response.json()["arrivals"][i]["origin"]["code_icao"])
-        print(response.json()["arrivals"][i]["actual_on"])
-        print(response.json()["arrivals"][i]["actual_off"])
-        print(response.json()["arrivals"][i]["actual_in"])
-        print("\n")
+def get_flights():
+    data = response.json()
 
-# Fetch flight data
+    for arrival in data["arrivals"]:
+        actual_off_str = arrival.get("actual_off")
+        actual_on_str = arrival.get("actual_on")
+        if not actual_off_str:
+            continue
+        actual_off = datetime.fromisoformat(actual_off_str.replace("Z", "+00:00"))
+        actual_on = datetime.fromisoformat(actual_on_str.replace("Z", "+00:00"))
+        start_datetime = datetime.fromisoformat(START_TIME.replace("Z", "+00:00"))
+        end_datetime = datetime.fromisoformat(END_TIME.replace("Z", "+00:00"))
+
+        if start_datetime <= actual_off and actual_on <= end_datetime: # flights with a departure time between start and end time
+            if not arrival["diverted"] and not arrival["cancelled"]:
+                load_json_data(arrival["ident"], arrival["flight_number"], arrival["blocked"],
+                               arrival["diverted"], arrival["cancelled"], arrival["origin"]["city"],
+                               arrival["origin"]["name"], arrival["origin"]["code_icao"],
+                               arrival["actual_on"], arrival["actual_off"], arrival["actual_in"])
+
+def load_json_data(ident, flight_number, blocked, diverted, cancelled, city, name, code_icao, actual_on, actual_off, actual_in):
+    data_payload["flights"].append({
+        "ident": ident,
+        "flight_number": flight_number,
+        "blocked": blocked,
+        "diverted": diverted,
+        "cancelled": cancelled,
+        "origin_city": city,
+        "origin_airport_name": name,
+        "code_icao": code_icao,
+        "runway_arrival": actual_on,
+        "runway_departure": actual_off,
+        "gate_arrival": actual_in
+    })
+
 
 if response.ok:
-    get_KCID_flights()
-    # flights = response.json().get("flights", [])
-    # print(f"Found {len(flights)} flights arriving in Cedar Rapids during your window:\n")
-
-    # for f in flights:
-    #     ident = f.get("ident", "N/A")
-    #     origin = f.get("origin", {})
-
-    #     origin_code = origin.get("code", "Unknown")
-    #     origin_city = origin.get("city", "Unknown City")
-    #     origin_name = origin.get("name", "Unknown Airport")
-
-    #     arrival_time_utc = f.get("arrival_time", {}).get("actual")
-    #     arrival_ct = to_central_time(arrival_time_utc)
-
-    #     print(f"✈️ Flight {ident} from {origin_city} ({origin_code}) — {origin_name}")
-    #     print(f"   Arrived at: {arrival_ct}\n")
+    get_flights()
+    print(data_payload)
+    data_payload.clear()
 else:
     print("Error:", response.status_code, response.text)
