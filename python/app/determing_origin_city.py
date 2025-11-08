@@ -1,15 +1,19 @@
+import os, json
 from datetime import datetime
+from dotenv import load_dotenv
 import requests
-API_KEY = "NZwWg0a6maLfecEXeptumW9bopVjr9xp"
+
+# Load env vars from .env
+load_dotenv()
 
 # Time window in UTC
 START_TIME = "2025-10-30T22:00:00Z"  # after Oct 30, 5 PM local
 END_TIME = "2025-10-31T22:10:00Z"    # before Oct 31, 5:10 PM local
-
+TARGET_ICAO = "KCID"
 # Endpoint for arrivals at Cedar Rapids (CID)
-url = "https://aeroapi.flightaware.com/aeroapi/airports/KCID/flights/arrivals"
+URL = f"https://aeroapi.flightaware.com/aeroapi/airports/{TARGET_ICAO}/flights/arrivals"
 
-headers = {"x-apikey": API_KEY}
+headers = {"x-apikey": os.getenv("API_KEY")}
 params = {
     "start": START_TIME,
     "end": END_TIME,
@@ -17,7 +21,7 @@ params = {
 
 data_payload = {"flights": []}
 
-response = requests.get(url, headers=headers, params=params)
+response = requests.get(URL, headers=headers, params=params)
 
 def get_flights():
     data = response.json()
@@ -54,10 +58,13 @@ def load_json_data(ident, flight_number, blocked, diverted, cancelled, city, nam
         "gate_arrival": actual_in
     })
 
+def write_json():
+    with open("python/app/frontend_payload.json", "w") as f:
+        json.dump(data_payload, f)
 
 if response.ok:
     get_flights()
-    print(data_payload)
+    write_json()
     data_payload.clear()
 else:
     print("Error:", response.status_code, response.text)
