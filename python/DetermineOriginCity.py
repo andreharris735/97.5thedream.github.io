@@ -1,10 +1,12 @@
 from datetime import datetime
 import requests
+
 API_KEY = "NZwWg0a6maLfecEXeptumW9bopVjr9xp"
 
 # Time window in UTC
 START_TIME = "2025-10-30T22:00:00Z"  # after Oct 30, 5 PM local
 END_TIME = "2025-10-31T22:10:00Z"    # before Oct 31, 5:10 PM local
+
 
 # Endpoint for arrivals at Cedar Rapids (CID)
 url = "https://aeroapi.flightaware.com/aeroapi/airports/KCID/flights/arrivals"
@@ -20,6 +22,17 @@ data_payload = {"flights": []}
 response = requests.get(url, headers=headers, params=params)
 
 def get_flights():
+    """
+    Fetches flight arrival data from the FlightAware AeroAPI and filters it
+    based on actual departure and arrival times.
+
+    Flights are excluded if:
+    - They never left the runway (no `actual_off` timestamp).
+    - Their departure time is before START_TIME or arrival time is after END_TIME.
+
+    Returns:
+        None
+    """
     data = response.json()
 
     for arrival in data["arrivals"]:
@@ -40,6 +53,26 @@ def get_flights():
                                arrival["actual_on"], arrival["actual_off"], arrival["actual_in"])
 
 def load_json_data(ident, flight_number, blocked, diverted, cancelled, city, name, code_icao, actual_on, actual_off, actual_in):
+    """
+    Appends flight information as a JSON-compatible dictionary to the global data payload.
+
+    Args:
+    ident (str): The flight identifier (e.g., "ENY4318").
+    flight_number (str): The airline's flight number.
+    blocked (bool): Whether the flight information is blocked.
+    diverted (bool): Whether the flight was diverted.
+    cancelled (bool): Whether the flight was cancelled.
+    city (str): The origin city of the flight.
+    name (str): The name of the origin airport.
+    code_icao (str): The ICAO code of the origin airport.
+    actual_on (str): Timestamp when the flight landed (runway on).
+    actual_off (str): Timestamp when the flight took off (runway off).
+    actual_in (str): Timestamp when the flight arrived at the gate.
+
+    Returns:
+    None
+    """
+
     data_payload["flights"].append({
         "ident": ident,
         "flight_number": flight_number,
